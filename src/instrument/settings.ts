@@ -15,14 +15,16 @@ export const DEFAULTS: Settings = {
   register: 0,
   size: 76,
   timbre: 'triangle',
-  volume: 0.3,
+  volume: 0.6,
 };
 
-const STORAGE_KEY = 'hex-edo.settings.v1';
+const STORAGE_KEY = 'hex-edo.settings.v2';
+const LEGACY_KEY = 'hex-edo.settings.v1';
 
 export function readSettings(): Settings {
   try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const value = JSON.parse(stored ?? localStorage.getItem(LEGACY_KEY) ?? 'null');
 
     if (
       !value ||
@@ -44,7 +46,10 @@ export function readSettings(): Settings {
     )
       return { ...DEFAULTS };
 
-    return value;
+    return {
+      ...value,
+      volume: stored === null && value.volume === 0.3 ? DEFAULTS.volume : value.volume,
+    };
   } catch {
     return { ...DEFAULTS };
   }

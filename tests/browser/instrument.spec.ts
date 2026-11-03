@@ -1,20 +1,34 @@
 import { test, expect } from '@playwright/test';
+import { makeLayout } from '../../src/instrument/layout';
 
-test('audio activation, all EDO choices, settings validation and persistence', async ({ page }) => {
+test('audio activation, all EDO choices, settings validation and persistence', async ({
+  page,
+}, testInfo) => {
   const errors: string[] = [];
 
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Enable audio' })).toBeVisible();
   await page.getByRole('button', { name: 'Enable audio' }).click();
-  await expect(page.getByRole('status')).toHaveText('Audio on');
+  await expect(page.getByRole('button', { name: 'Enable audio' })).toHaveCount(0);
   await expect(page.locator('canvas')).toBeVisible();
 
   for (let edo = 2; edo <= 9; edo++) {
+    if (testInfo.project.name !== 'desktop-chromium')
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('EDO tuning').selectOption(String(edo));
-    await expect(page.getByLabel('EDO tuning')).toHaveValue(String(edo));
+    if (testInfo.project.name === 'desktop-chromium') {
+      await expect(page.getByLabel('EDO tuning')).toHaveValue(String(edo));
+      await expect(page.getByLabel('EDO tuning')).not.toBeFocused();
+    } else
+      await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
   }
 
+  if (testInfo.project.name !== 'desktop-chromium')
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('EDO tuning').selectOption('6');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('Right axis steps', { exact: true }).fill('2');
@@ -46,7 +60,7 @@ test('portrait blocks mobile play and landscape restores the keyboard', async ({
     await expect(page.getByTestId('keyboard')).toBeVisible();
     await expect(page.getByText('Rotate your phone')).toHaveCount(0);
   } else {
-    await expect(page.getByText('Rotate your phone')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start playing' })).toBeVisible();
     await expect(page.getByTestId('keyboard')).toHaveCount(0);
     await page.setViewportSize({ width: 844, height: 390 });
     if (testInfo.project.name === 'iphone-webkit')
@@ -89,6 +103,8 @@ test('audio receives independent desktop shortcuts and pointer cleanup', async (
   await page.getByRole('button', { name: 'Enable audio' }).click();
   await expect(page.getByRole('status')).toHaveText('Audio on');
   await expect(page.locator('canvas')).toBeVisible();
+  await page.getByLabel('EDO tuning').selectOption('9');
+  await expect(page.getByLabel('EDO tuning')).not.toBeFocused();
   await page.keyboard.down('1');
   await page.keyboard.down('2');
   await page.keyboard.up('1');
@@ -102,10 +118,13 @@ test('audio receives independent desktop shortcuts and pointer cleanup', async (
   const box = await page.getByTestId('keyboard').boundingBox();
 
   if (!box) throw new Error('Missing keyboard');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const key = makeLayout(box.width, box.height, 76, true, { edo: 9, a: 1, b: 5, register: 0 })
+    .keys[15];
+
+  await page.mouse.move(box.x + key.x, box.y + key.y);
   await page.mouse.down();
   await expect.poll(async () => (await audit()).filter((voice) => !voice.stopped).length).toBe(1);
-  await page.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2);
+  await page.mouse.move(box.x + key.x + 40, box.y + key.y);
   await page.mouse.up();
   await expect.poll(async () => (await audit()).filter((voice) => !voice.stopped).length).toBe(0);
   await page.keyboard.down('a');

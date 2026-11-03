@@ -1,5 +1,5 @@
 import { frequency } from '../instrument/tuning';
-import type { Timbre } from '../instrument/settings';
+import { DEFAULTS, type Timbre } from '../instrument/settings';
 
 interface Voice {
   oscillator: OscillatorNode;
@@ -13,7 +13,7 @@ export class Synth {
   private context?: AudioContext;
   private master?: GainNode;
   private voices = new Map<string, Voice>();
-  private volume = 0.3;
+  private volume = DEFAULTS.volume;
   onStatus: (status: AudioStatus) => void = () => {};
 
   get voiceCount() {

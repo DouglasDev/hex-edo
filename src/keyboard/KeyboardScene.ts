@@ -43,8 +43,8 @@ export class KeyboardScene extends Phaser.Scene {
         const angle = ((60 * i - 30) * Math.PI) / 180;
 
         return new Phaser.Math.Vector2(
-          key.x + (this.layout!.radius - 3) * Math.cos(angle),
-          key.y + (this.layout!.radius - 3) * Math.sin(angle),
+          key.x + (this.layout!.radius - (this.desktop ? 3 : 1)) * Math.cos(angle),
+          key.y + (this.layout!.radius - (this.desktop ? 3 : 1)) * Math.sin(angle),
         );
       });
 

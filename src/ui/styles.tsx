@@ -10,6 +10,9 @@ export const Shell = styled.main`
     padding-top: max(6px, env(safe-area-inset-top));
     padding-bottom: max(4px, env(safe-area-inset-bottom));
   }
+  &[data-mobile='true'] {
+    padding: 0;
+  }
 `;
 
 export const Header = styled.header`
@@ -147,6 +150,10 @@ export const BoardFrame = styled.div`
   position: relative;
   border: 1px solid #252c37;
   border-radius: 14px;
+  &[data-mobile='true'] {
+    border: 0;
+    border-radius: 0;
+  }
   overflow: hidden;
   background: #0d1119;
 `;
@@ -201,6 +208,13 @@ export const Panel = styled.aside`
   box-shadow: 0 18px 60px #0008;
   padding: 18px;
   overflow-y: auto;
+  &[data-mobile='true'] {
+    left: max(0px, env(safe-area-inset-left));
+    right: auto;
+    top: max(52px, calc(env(safe-area-inset-top) + 48px));
+    bottom: 0;
+    border-radius: 0;
+  }
 `;
 
 export const PanelTitle = styled.h2`

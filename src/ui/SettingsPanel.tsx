@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Settings, Timbre } from '../instrument/settings';
 import { validMapping } from '../instrument/tuning';
 import {
@@ -15,10 +15,12 @@ import {
 
 interface Props {
   settings: Settings;
+  mobile?: boolean;
+  tuning?: ReactNode;
   update: (value: Partial<Settings>) => void;
 }
 
-export function SettingsPanel({ settings, update }: Props) {
+export function SettingsPanel({ settings, update, mobile = false, tuning }: Props) {
   const [a, setA] = useState(String(settings.a));
   const [b, setB] = useState(String(settings.b));
   const valid =
@@ -30,8 +32,9 @@ export function SettingsPanel({ settings, update }: Props) {
   const changed = Number(a) !== settings.a || Number(b) !== settings.b;
 
   return (
-    <Panel id="settings-panel" aria-label="Instrument settings">
+    <Panel id="settings-panel" aria-label="Instrument settings" data-mobile={mobile}>
       <PanelTitle>Settings</PanelTitle>
+      {tuning}
       <Field>
         Right axis · steps
         <NumberInput

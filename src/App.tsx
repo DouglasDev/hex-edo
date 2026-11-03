@@ -3,7 +3,10 @@ import { Synth, type AudioStatus } from './audio/Synth';
 import { Keyboard } from './keyboard/Keyboard';
 import { readSettings, saveSettings, type Settings } from './instrument/settings';
 import { useDevice } from './ui/useDevice';
+import { useMobileDisplay } from './ui/useMobileDisplay';
+import { MobileControls } from './ui/MobileControls';
 import { SettingsPanel } from './ui/SettingsPanel';
+import { TuningControl } from './ui/TuningControl';
 import {
   Activation,
   BoardFrame,
@@ -18,10 +21,8 @@ import {
   RootLegend,
   Rotate,
   RotateIcon,
-  Select,
   Shell,
   Status,
-  TuningLabel,
   Workspace,
 } from './ui/styles';
 
@@ -31,6 +32,7 @@ export function App() {
   const [audio, setAudio] = useState<AudioStatus>('off');
   const [open, setOpen] = useState(false);
   const { desktop, portrait } = useDevice();
+  const display = useMobileDisplay(!desktop, portrait);
 
   useEffect(() => {
     synth.onStatus = setAudio;
@@ -50,67 +52,79 @@ export function App() {
   const update = (value: Partial<Settings>) =>
     setSettings((previous) => ({ ...previous, ...value }));
 
+  const start = () => {
+    void synth.enable();
+    if (!desktop) display.start();
+  };
+
+  const changeTuning = (edo: number) => {
+    update({ edo, a: 1, b: Math.ceil(edo / 2) });
+    setOpen(false);
+  };
+
+  const tuning = <TuningControl edo={settings.edo} onChange={changeTuning} />;
+  const status = (
+    <Status data-ready={audio === 'ready'} role="status">
+      {audio === 'ready'
+        ? 'Audio on'
+        : audio === 'off'
+          ? 'Audio off'
+          : audio === 'error'
+            ? 'Audio unavailable · retry'
+            : 'Audio paused'}
+    </Status>
+  );
+
   if (portrait)
     return (
       <Rotate>
         <RotateIcon aria-hidden="true" />
-        <span>Rotate your phone</span>
+        <EnableButton onClick={start}>Start playing</EnableButton>
+        {display.manualRotation && <span>Rotate your phone</span>}
       </Rotate>
     );
 
   return (
-    <Shell>
-      <Header>
-        <Brand>
-          <Mark aria-hidden="true">⬡</Mark>Hex EDO
-        </Brand>
-        <Controls>
-          <TuningLabel>
-            Tuning
-            <Select
-              aria-label="EDO tuning"
-              value={settings.edo}
-              onChange={(event) => {
-                const edo = Number(event.target.value);
-
-                update({ edo, a: 1, b: Math.ceil(edo / 2) });
-              }}
+    <Shell data-mobile={!desktop}>
+      {desktop && (
+        <Header>
+          <Brand>
+            <Mark aria-hidden="true">⬡</Mark>Hex EDO
+          </Brand>
+          <Controls>
+            {tuning}
+            <Button
+              onClick={() => setOpen((value) => !value)}
+              aria-expanded={open}
+              aria-controls="settings-panel"
+              aria-pressed={open}
             >
-              {[2, 3, 4, 5, 6, 7, 8, 9].map((edo) => (
-                <option key={edo} value={edo}>
-                  {edo} EDO
-                </option>
-              ))}
-            </Select>
-          </TuningLabel>
-          <Button
-            onClick={() => setOpen((value) => !value)}
-            aria-expanded={open}
-            aria-controls="settings-panel"
-            aria-pressed={open}
-          >
-            Settings
-          </Button>
-        </Controls>
-      </Header>
+              Settings
+            </Button>
+          </Controls>
+        </Header>
+      )}
+      {!desktop && (
+        <MobileControls
+          open={open}
+          onMenu={() => setOpen((value) => !value)}
+          fullscreen={display.active}
+          fullscreenSupported={display.supported}
+          onFullscreen={display.toggle}
+        />
+      )}
       <Workspace>
-        <BoardTopline>
-          <span>
-            → {settings.a > 0 ? '+' : ''}
-            {settings.a} &nbsp; ↘ {settings.b > 0 ? '+' : ''}
-            {settings.b} steps
-          </span>
-          <Status data-ready={audio === 'ready'} role="status">
-            {audio === 'ready'
-              ? 'Audio on'
-              : audio === 'off'
-                ? 'Audio off'
-                : audio === 'error'
-                  ? 'Audio unavailable · retry'
-                  : 'Audio paused'}
-          </Status>
-        </BoardTopline>
-        <BoardFrame>
+        {desktop && (
+          <BoardTopline>
+            <span>
+              → {settings.a > 0 ? '+' : ''}
+              {settings.a} &nbsp; ↘ {settings.b > 0 ? '+' : ''}
+              {settings.b} steps
+            </span>
+            {status}
+          </BoardTopline>
+        )}
+        <BoardFrame data-mobile={!desktop}>
           <Keyboard
             settings={settings}
             desktop={desktop}
@@ -119,20 +133,35 @@ export function App() {
           />
           {audio !== 'ready' && (
             <Activation>
-              <EnableButton onClick={() => void synth.enable()}>
+              <EnableButton onClick={start}>
                 {audio === 'off' ? 'Enable audio' : 'Resume audio'}
               </EnableButton>
             </Activation>
           )}
         </BoardFrame>
-        {open && <SettingsPanel key={settings.edo} settings={settings} update={update} />}
+        {open && (
+          <SettingsPanel
+            key={settings.edo}
+            settings={settings}
+            update={update}
+            mobile={!desktop}
+            tuning={
+              !desktop ? (
+                <>
+                  {tuning}
+                  {status}
+                </>
+              ) : undefined
+            }
+          />
+        )}
       </Workspace>
-      <Footer>
-        <RootLegend>Root · degree 0</RootLegend>
-        <span>
-          {desktop ? 'Letters / numbers to play · drag to bend' : 'Touch to play · slide to bend'}
-        </span>
-      </Footer>
+      {desktop && (
+        <Footer>
+          <RootLegend>Root · degree 0</RootLegend>
+          <span>Letters / numbers to play · drag to bend</span>
+        </Footer>
+      )}
     </Shell>
   );
 }

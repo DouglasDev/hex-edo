@@ -18,7 +18,9 @@ export interface Layout {
   mapping: Mapping;
 }
 
-export const SHORTCUTS = '1234567890qwertyuiopasdfghjklzxcvbnm';
+export const SHORTCUT_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+
+export const SHORTCUTS = SHORTCUT_ROWS.join('');
 
 export function makeLayout(
   width: number,
@@ -29,24 +31,38 @@ export function makeLayout(
 ): Layout {
   const radius = diameter / 2;
   const keyWidth = Math.sqrt(3) * radius;
+  const paddingX = desktop ? 24 : 0;
+  const paddingY = desktop ? 20 : 0;
   const rows = Math.max(
     0,
-    Math.min(desktop ? 4 : 5, Math.floor((height - 20 - radius / 2) / (1.5 * radius))),
+    Math.min(desktop ? 4 : Infinity, Math.floor((height - paddingY - radius / 2) / (1.5 * radius))),
   );
-  const columns = Math.max(
+
+  const rowOffset = (row: number) => (desktop ? row / 2 : (row % 2) / 2);
+
+  const columns = Array.from({ length: rows }, (_, row) =>
+    Math.max(
+      0,
+      Math.min(
+        desktop ? SHORTCUT_ROWS[row].length : Infinity,
+        Math.floor((width - paddingX) / keyWidth - rowOffset(row)),
+      ),
+    ),
+  );
+  const boardWidth = Math.max(
     0,
-    Math.min(9, Math.floor((width - 24) / keyWidth - (rows > 1 ? 0.5 : 0))),
+    ...columns.map((count, row) => (count ? (count + rowOffset(row)) * keyWidth : 0)),
   );
-  const offsetX = (width - (columns + (rows > 1 ? 0.5 : 0)) * keyWidth) / 2 + keyWidth / 2;
+  const offsetX = (width - boardWidth) / 2 + keyWidth / 2;
   const offsetY = (height - ((rows - 1) * 1.5 * radius + 2 * radius)) / 2 + radius;
   const middleR = Math.floor(rows / 2);
-  const middleQ = Math.floor(columns / 2) - Math.floor(middleR / 2);
+  const middleQ = Math.floor((columns[middleR] ?? 0) / 2) - (desktop ? 0 : Math.floor(middleR / 2));
   const origin = -mapping.a * middleQ - mapping.b * middleR;
   const keys: KeyCell[] = [];
 
   for (let row = 0; row < rows; row++) {
-    for (let column = 0; column < columns; column++) {
-      const q = column - Math.floor(row / 2);
+    for (let column = 0; column < columns[row]; column++) {
+      const q = column - (desktop ? 0 : Math.floor(row / 2));
       const r = row;
 
       keys.push({
@@ -55,7 +71,7 @@ export function makeLayout(
         x: offsetX + keyWidth * (q + r / 2),
         y: offsetY + 1.5 * radius * r,
         step: stepAt(q, r, origin, mapping),
-        shortcut: desktop ? SHORTCUTS[keys.length] : undefined,
+        shortcut: desktop ? SHORTCUT_ROWS[row][column] : undefined,
       });
     }
   }

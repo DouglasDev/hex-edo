@@ -28,5 +28,5 @@ export function stepAt(q: number, r: number, origin: number, mapping: Mapping): 
 }
 
 export function noteLabel(step: number, edo: number): string {
-  return `${mod(step, edo)} · ${4 + Math.floor(step / edo)}`;
+  return `${mod(step, edo) + 1} · ${4 + Math.floor(step / edo)}`;
 }

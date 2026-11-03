@@ -288,3 +288,23 @@ export const RotateIcon = styled.span`
     color: #b8efca;
   }
 `;
+
+export const SliderStack = styled.div`
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+export const SizeReadout = styled.output`
+  color: #b4bec9;
+  font:
+    10px 'DM Mono',
+    monospace;
+  text-align: right;
+  max-width: 190px;
+`;
+
+export const SizeResetButton = styled(Button)`
+  margin-bottom: 16px;
+`;

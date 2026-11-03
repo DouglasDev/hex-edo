@@ -70,6 +70,7 @@ export function Keyboard({ settings, desktop, synth, enabled }: Props) {
     settings.b,
     settings.register,
     settings.size,
+    settings.sizeMode,
     settings.timbre,
     desktop,
     enabled,

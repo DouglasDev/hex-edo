@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Synth, type AudioStatus } from './audio/Synth';
 import { Keyboard } from './keyboard/Keyboard';
 import { readSettings, saveSettings, type Settings } from './instrument/settings';
+import { diameterForRows } from './instrument/keySize';
 import { useDevice } from './ui/useDevice';
 import { useMobileDisplay } from './ui/useMobileDisplay';
 import { MobileControls } from './ui/MobileControls';
@@ -31,7 +32,9 @@ export function App() {
   const [synth] = useState(() => new Synth());
   const [audio, setAudio] = useState<AudioStatus>('off');
   const [open, setOpen] = useState(false);
-  const { desktop, portrait } = useDevice();
+  const { desktop, portrait, height } = useDevice();
+  const effectiveSize =
+    !desktop && settings.sizeMode === 'rows' ? diameterForRows(height) : settings.size;
   const display = useMobileDisplay(!desktop, portrait);
 
   useEffect(() => {
@@ -145,6 +148,7 @@ export function App() {
             settings={settings}
             update={update}
             mobile={!desktop}
+            effectiveSize={effectiveSize}
             tuning={
               !desktop ? (
                 <>
@@ -158,7 +162,7 @@ export function App() {
       </Workspace>
       {desktop && (
         <Footer>
-          <RootLegend>Root · degree 0</RootLegend>
+          <RootLegend>Root · degree 1</RootLegend>
           <span>Letters / numbers to play · drag to bend</span>
         </Footer>
       )}

@@ -46,9 +46,9 @@ test('invalid mappings and negative octave labels', () => {
   assert.equal(validMapping(0, 0, 7), false);
   assert.equal(validMapping(0.5, 1, 7), false);
   assert.equal(validMapping(-2, 3, 6), true);
-  assert.equal(noteLabel(-1, 7), '6 · 3');
-  assert.equal(noteLabel(0, 7), '0 · 4');
-  assert.equal(noteLabel(7, 7), '0 · 5');
+  assert.equal(noteLabel(-1, 7), '7 · 3');
+  assert.equal(noteLabel(0, 7), '1 · 4');
+  assert.equal(noteLabel(7, 7), '1 · 5');
 });
 
 test('desktop shortcuts are unique and mobile has no shortcut labels', () => {

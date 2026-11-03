@@ -1,3 +1,4 @@
+import { bindTouchBatch } from './bindTouchBatch';
 import type { Synth } from '../audio/Synth';
 import { Performance } from '../instrument/Performance';
 import type { Timbre } from '../instrument/settings';
@@ -26,7 +27,10 @@ export function bindInput({ element, scene, synth, timbre, desktop, enabled }: I
     return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
   };
 
+  const unbindTouch = bindTouchBatch(element, performance);
+
   const down = (event: PointerEvent) => {
+    if (unbindTouch && event.pointerType === 'touch') return;
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     event.preventDefault();
     const point = coordinates(event);
@@ -37,12 +41,14 @@ export function bindInput({ element, scene, synth, timbre, desktop, enabled }: I
   };
 
   const move = (event: PointerEvent) => {
+    if (unbindTouch && event.pointerType === 'touch') return;
     const point = coordinates(event);
 
     scene.performance?.move(`pointer:${event.pointerId}`, point.x, point.y);
   };
 
   const up = (event: PointerEvent) => {
+    if (unbindTouch && event.pointerType === 'touch') return;
     scene.performance?.up(`pointer:${event.pointerId}`);
   };
 
@@ -97,6 +103,7 @@ export function bindInput({ element, scene, synth, timbre, desktop, enabled }: I
     stop,
     dispose() {
       stop();
+      unbindTouch?.();
       element.removeEventListener('pointerdown', down);
       element.removeEventListener('pointermove', move);
       element.removeEventListener('pointerup', up);

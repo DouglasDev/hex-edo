@@ -6,7 +6,11 @@ export function useDevice() {
       matchMedia('(pointer: coarse)').matches &&
       (navigator.maxTouchPoints > 0 || /Mobi|Android/i.test(navigator.userAgent));
 
-    return { desktop: !mobile, portrait: mobile && window.innerHeight > window.innerWidth };
+    return {
+      desktop: !mobile,
+      portrait: mobile && window.innerHeight > window.innerWidth,
+      height: window.innerHeight,
+    };
   };
 
   const [device, setDevice] = useState(read);

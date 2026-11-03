@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { Settings, Timbre } from '../instrument/settings';
+import { keySizeLabel } from '../instrument/keySize';
 import { validMapping } from '../instrument/tuning';
 import {
   Button,
@@ -11,16 +12,20 @@ import {
   PanelTitle,
   Range,
   Select,
+  SizeReadout,
+  SizeResetButton,
+  SliderStack,
 } from './styles';
 
 interface Props {
   settings: Settings;
   mobile?: boolean;
+  effectiveSize: number;
   tuning?: ReactNode;
   update: (value: Partial<Settings>) => void;
 }
 
-export function SettingsPanel({ settings, update, mobile = false, tuning }: Props) {
+export function SettingsPanel({ settings, update, mobile = false, tuning, effectiveSize }: Props) {
   const [a, setA] = useState(String(settings.a));
   const [b, setB] = useState(String(settings.b));
   const valid =
@@ -59,13 +64,13 @@ export function SettingsPanel({ settings, update, mobile = false, tuning }: Prop
       </Field>
       {!valid && (
         <ErrorText role="alert">
-          Use whole numbers from −12 to 12 that reach every degree of {settings.edo} EDO.
+          Use whole numbers from −12 to 12 that reach every pitch of {settings.edo} EDO.
         </ErrorText>
       )}
       <Button disabled={!valid || !changed} onClick={() => update({ a: Number(a), b: Number(b) })}>
         Apply mapping
       </Button>
-      <Detail>Degree zero: C4 · 261.626 Hz</Detail>
+      <Detail>Root (degree 1): C4 · 261.626 Hz</Detail>
       <Field>
         Register
         <Select
@@ -83,16 +88,31 @@ export function SettingsPanel({ settings, update, mobile = false, tuning }: Prop
       </Field>
       <Field>
         Key size
-        <Range
-          aria-label="Key size"
-          type="range"
-          min={48}
-          max={112}
-          step={4}
-          value={settings.size}
-          onChange={(event) => update({ size: Number(event.target.value) })}
-        />
+        <SliderStack>
+          <Range
+            aria-label="Key size"
+            aria-describedby="key-size-readout"
+            type="range"
+            min={48}
+            max={Math.max(240, Math.ceil(effectiveSize))}
+            step={1}
+            value={effectiveSize}
+            onChange={(event) => update({ size: Number(event.target.value), sizeMode: 'pixels' })}
+          />
+          <SizeReadout id="key-size-readout" aria-live="polite">
+            {keySizeLabel(effectiveSize)}
+          </SizeReadout>
+        </SliderStack>
       </Field>
+      {mobile && (
+        <SizeResetButton
+          aria-pressed={settings.sizeMode === 'rows'}
+          onClick={() => update({ sizeMode: 'rows' })}
+        >
+          Fit 5 rows
+        </SizeResetButton>
+      )}
+
       <Field>
         Timbre
         <Select

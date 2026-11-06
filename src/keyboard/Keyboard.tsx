@@ -3,6 +3,7 @@ import { styled } from '@linaria/react';
 import * as Phaser from 'phaser';
 import type { Synth } from '../audio/Synth';
 import type { Settings } from '../instrument/settings';
+import type { InputMonitor } from './InputMonitor';
 import { bindInput } from './bindInput';
 import { KeyboardScene } from './KeyboardScene';
 
@@ -14,6 +15,7 @@ const Surface = styled.div`
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   canvas {
     display: block;
   }
@@ -24,9 +26,10 @@ interface Props {
   desktop: boolean;
   synth: Synth;
   enabled: boolean;
+  monitor: InputMonitor;
 }
 
-export function Keyboard({ settings, desktop, synth, enabled }: Props) {
+export function Keyboard({ settings, desktop, synth, enabled, monitor }: Props) {
   const host = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -48,7 +51,16 @@ export function Keyboard({ settings, desktop, synth, enabled }: Props) {
       fps: { target: 30, forceSetTimeOut: true },
     });
 
-    const input = bindInput({ element, scene, synth, timbre: settings.timbre, desktop, enabled });
+    const input = bindInput({
+      element,
+      scene,
+      synth,
+      timbre: settings.timbre,
+      desktop,
+      enabled,
+      touchInput: settings.touchInput,
+      monitor,
+    });
 
     const observer = new ResizeObserver(() => {
       input.stop();
@@ -72,6 +84,8 @@ export function Keyboard({ settings, desktop, synth, enabled }: Props) {
     settings.size,
     settings.sizeMode,
     settings.timbre,
+    settings.touchInput,
+    monitor,
     desktop,
     enabled,
     synth,

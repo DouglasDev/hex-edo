@@ -17,7 +17,7 @@ pnpm run test:browser
 pnpm run build
 ```
 
-Browser tests use Playwright Chromium and WebKit (`pnpm exec playwright install chromium webkit`).
+Browser tests use Playwright Chromium, Firefox and WebKit (`pnpm exec playwright install chromium firefox webkit`).
 
 ## Mapping
 
@@ -37,4 +37,6 @@ Enable GitHub Pages with GitHub Actions as the source. Each push to main runs fo
 
 Physical iPhone/Android multitouch and audio latency require testing on the devices. Browser emulation does not establish real hardware latency or operating-system interruption behavior.
 
-Key backgrounds and labels are painted into one canvas texture to avoid independent text-layer backgrounds. Desktop pressed keys brighten without circular markers. Mobile touch batches process every changed contact, suppress browser defaults on the playing surface, and retain independent releases and bends. OnePlus screenshot gestures can intercept three-finger input before the web app receives it; disable three-finger swipe and touch-and-hold screenshot shortcuts in phone settings when playing.
+Key backgrounds and labels are painted into one canvas texture to avoid independent text-layer backgrounds. Desktop pressed keys brighten without circular markers. Mobile defaults to captured Pointer Events. Settings offers Touch (compatibility), which processes every changed contact as a batch with non-passive listeners. Both retain independent releases and bends. Settings reports peak browser-delivered contacts and cancellations for device diagnosis. Genuine cancellation always releases voices; JavaScript cannot prevent touchcancel or recover a contact suppressed before reaching the browser. OnePlus screenshot gestures can intercept three-finger input before the web app receives it; disable three-finger swipe and touch-and-hold screenshot shortcuts in phone settings when playing.
+
+Audio activation requests the playback session where supported, starts a silent buffer inside the gesture, and resumes Web Audio. Interrupted contexts are replaced on recovery. Restart audio in Settings recreates the audio context if the browser reports running but remains silent. Release uses portable gain scheduling instead of requiring cancelAndHoldAtTime. Desktop key-up is captured before bubbling listeners; focus loss still releases all voices.

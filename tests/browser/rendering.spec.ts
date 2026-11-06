@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { makeLayout } from '../../src/instrument/layout';
 import { diameterForRows, keySizeLabel } from '../../src/instrument/keySize';
 
 test('pixel size readout follows auto sizing, manual changes, and saved settings', async ({
   page,
 }, testInfo) => {
-  const mobile = testInfo.project.name !== 'desktop-chromium';
+  const mobile = !testInfo.project.name.startsWith('desktop');
 
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -42,7 +42,7 @@ test('pixel size readout follows auto sizing, manual changes, and saved settings
 test('desktop pressed key brightens outside the old circular indicator and restores on release', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-chromium', 'Desktop key highlight.');
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop key highlight.');
   await page.goto('/');
   await page.getByRole('button', { name: 'Enable audio' }).click();
   await expect(page.locator('canvas')).toHaveCount(1);

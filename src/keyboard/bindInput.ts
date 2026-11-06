@@ -1,3 +1,4 @@
+import type { InputMonitor } from './InputMonitor';
 import { bindTouchBatch } from './bindTouchBatch';
 import type { Synth } from '../audio/Synth';
 import { Performance } from '../instrument/Performance';
@@ -11,9 +12,20 @@ interface InputOptions {
   timbre: Timbre;
   desktop: boolean;
   enabled: boolean;
+  touchInput: 'pointer' | 'touch';
+  monitor: InputMonitor;
 }
 
-export function bindInput({ element, scene, synth, timbre, desktop, enabled }: InputOptions) {
+export function bindInput({
+  element,
+  scene,
+  synth,
+  timbre,
+  desktop,
+  enabled,
+  touchInput,
+  monitor,
+}: InputOptions) {
   const performance = () => {
     if (!scene.layout || !enabled) return undefined;
     if (!scene.performance) scene.performance = new Performance(synth, scene.layout, timbre);
@@ -27,7 +39,8 @@ export function bindInput({ element, scene, synth, timbre, desktop, enabled }: I
     return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
   };
 
-  const unbindTouch = bindTouchBatch(element, performance);
+  const unbindTouch =
+    touchInput === 'touch' ? bindTouchBatch(element, performance, monitor) : undefined;
 
   const down = (event: PointerEvent) => {
     if (unbindTouch && event.pointerType === 'touch') return;
@@ -35,6 +48,7 @@ export function bindInput({ element, scene, synth, timbre, desktop, enabled }: I
     event.preventDefault();
     const point = coordinates(event);
 
+    monitor.down(`pointer:${event.pointerId}`);
     performance()?.down(`pointer:${event.pointerId}`, point.x, point.y);
     if (scene.performance?.held.has(`pointer:${event.pointerId}`))
       element.setPointerCapture(event.pointerId);
@@ -49,6 +63,7 @@ export function bindInput({ element, scene, synth, timbre, desktop, enabled }: I
 
   const up = (event: PointerEvent) => {
     if (unbindTouch && event.pointerType === 'touch') return;
+    monitor.up(`pointer:${event.pointerId}`, event.type === 'pointercancel');
     scene.performance?.up(`pointer:${event.pointerId}`);
   };
 
@@ -80,6 +95,7 @@ export function bindInput({ element, scene, synth, timbre, desktop, enabled }: I
   };
 
   const stop = () => {
+    monitor.clear();
     scene.performance?.releaseAll();
     synth.releaseAll();
   };
@@ -94,7 +110,7 @@ export function bindInput({ element, scene, synth, timbre, desktop, enabled }: I
   element.addEventListener('pointercancel', up);
   element.addEventListener('lostpointercapture', up);
   window.addEventListener('keydown', keyDown);
-  window.addEventListener('keyup', keyUp);
+  window.addEventListener('keyup', keyUp, true);
   window.addEventListener('blur', stop);
   window.addEventListener('pagehide', stop);
   document.addEventListener('visibilitychange', visibility);
@@ -110,7 +126,7 @@ export function bindInput({ element, scene, synth, timbre, desktop, enabled }: I
       element.removeEventListener('pointercancel', up);
       element.removeEventListener('lostpointercapture', up);
       window.removeEventListener('keydown', keyDown);
-      window.removeEventListener('keyup', keyUp);
+      window.removeEventListener('keyup', keyUp, true);
       window.removeEventListener('blur', stop);
       window.removeEventListener('pagehide', stop);
       document.removeEventListener('visibilitychange', visibility);

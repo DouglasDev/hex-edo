@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Synth, type AudioStatus } from './audio/Synth';
+import { InputMonitor } from './keyboard/InputMonitor';
 import { Keyboard } from './keyboard/Keyboard';
 import { readSettings, saveSettings, type Settings } from './instrument/settings';
 import { diameterForRows } from './instrument/keySize';
@@ -30,6 +31,7 @@ import {
 export function App() {
   const [settings, setSettings] = useState(readSettings);
   const [synth] = useState(() => new Synth());
+  const [monitor] = useState(() => new InputMonitor());
   const [audio, setAudio] = useState<AudioStatus>('off');
   const [open, setOpen] = useState(false);
   const { desktop, portrait, height } = useDevice();
@@ -52,8 +54,10 @@ export function App() {
     if (portrait || open) synth.releaseAll();
   }, [portrait, open, synth]);
 
-  const update = (value: Partial<Settings>) =>
+  const update = (value: Partial<Settings>) => {
+    if (value.touchInput && value.touchInput !== settings.touchInput) monitor.reset();
     setSettings((previous) => ({ ...previous, ...value }));
+  };
 
   const start = () => {
     void synth.enable();
@@ -130,6 +134,7 @@ export function App() {
         <BoardFrame data-mobile={!desktop}>
           <Keyboard
             settings={settings}
+            monitor={monitor}
             desktop={desktop}
             synth={synth}
             enabled={audio === 'ready' && !open}
@@ -146,7 +151,12 @@ export function App() {
           <SettingsPanel
             key={settings.edo}
             settings={settings}
+            monitor={monitor}
             update={update}
+            onRestartAudio={() => {
+              synth.dispose();
+              void synth.enable();
+            }}
             mobile={!desktop}
             effectiveSize={effectiveSize}
             tuning={

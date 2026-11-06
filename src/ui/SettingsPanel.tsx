@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import type { InputMonitor } from '../keyboard/InputMonitor';
 import type { Settings, Timbre } from '../instrument/settings';
 import { keySizeLabel } from '../instrument/keySize';
 import { validMapping } from '../instrument/tuning';
@@ -19,13 +20,23 @@ import {
 
 interface Props {
   settings: Settings;
+  monitor: InputMonitor;
+  onRestartAudio: () => void;
   mobile?: boolean;
   effectiveSize: number;
   tuning?: ReactNode;
   update: (value: Partial<Settings>) => void;
 }
 
-export function SettingsPanel({ settings, update, mobile = false, tuning, effectiveSize }: Props) {
+export function SettingsPanel({
+  settings,
+  update,
+  mobile = false,
+  tuning,
+  effectiveSize,
+  monitor,
+  onRestartAudio,
+}: Props) {
   const [a, setA] = useState(String(settings.a));
   const [b, setB] = useState(String(settings.b));
   const valid =
@@ -140,9 +151,42 @@ export function SettingsPanel({ settings, update, mobile = false, tuning, effect
       <Detail>
         Key labels: degree · octave on touch screens; degree · octave · shortcut on desktop.
       </Detail>
+      {mobile && (
+        <Field>
+          Touch input
+          <Select
+            aria-label="Touch input"
+            value={settings.touchInput}
+            onChange={(event) =>
+              update({ touchInput: event.target.value as Settings['touchInput'] })
+            }
+          >
+            <option value="pointer">Pointer</option>
+            <option value="touch">Touch (compatibility)</option>
+          </Select>
+        </Field>
+      )}
+      {mobile && <InputStatus monitor={monitor} />}
+      <Button onClick={onRestartAudio}>Restart audio</Button>
       <Detail>
         Build <span data-testid="commit">{__APP_COMMIT__}</span>
       </Detail>
     </Panel>
+  );
+}
+
+function InputStatus({ monitor }: { monitor: InputMonitor }) {
+  const [, refresh] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => refresh((value) => value + 1), 250);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <Detail role="status">
+      Contacts: {monitor.count} · peak: {monitor.peak} · cancellations: {monitor.cancellations}
+    </Detail>
   );
 }

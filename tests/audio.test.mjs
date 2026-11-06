@@ -18,7 +18,7 @@ class Param {
     this.value = value;
   }
 
-  cancelAndHoldAtTime() {}
+  cancelScheduledValues() {}
 }
 
 class Node {
@@ -57,6 +57,14 @@ class Context {
     Context.latest = this;
   }
 
+  createBuffer() {
+    return {};
+  }
+
+  createBufferSource() {
+    return new Node();
+  }
+
   createGain() {
     return new Node();
   }
@@ -89,6 +97,13 @@ class Context {
 
 test('synth activates, bends separate oscillator voices and recovers from interruption', async () => {
   globalThis.AudioContext = Context;
+  const session = { type: 'auto' };
+
+  Object.defineProperty(globalThis.navigator, 'audioSession', {
+    configurable: true,
+    value: session,
+  });
+
   const synth = new Synth();
   const statuses = [];
 
@@ -96,6 +111,7 @@ test('synth activates, bends separate oscillator voices and recovers from interr
   assert.equal(synth.start('one', 0, 7, 'triangle'), false);
   await synth.enable();
   assert.equal(statuses.at(-1), 'ready');
+  assert.equal(session.type, 'playback');
   assert.equal(synth.start('one', 0, 7, 'triangle'), true);
   assert.equal(synth.start('two', 0, 7, 'sawtooth'), true);
   assert.equal(synth.voiceCount, 2);
@@ -112,8 +128,13 @@ test('synth activates, bends separate oscillator voices and recovers from interr
   assert.equal(synth.voiceCount, 0);
   assert.equal(Context.latest.oscillators[1].stopped, true);
   assert.equal(statuses.at(-1), 'suspended');
+  const interrupted = Context.latest;
+
   await synth.enable();
+  assert.notEqual(Context.latest, interrupted);
+  assert.equal(interrupted.state, 'closed');
   assert.equal(statuses.at(-1), 'ready');
   synth.dispose();
   assert.equal(Context.latest.state, 'closed');
+  delete globalThis.navigator.audioSession;
 });

@@ -5,6 +5,7 @@ interface Voice {
   oscillator: OscillatorNode;
   envelope: GainNode;
   filter: BiquadFilterNode;
+  startedAt: number;
 }
 
 export type AudioStatus = 'off' | 'ready' | 'suspended' | 'error';
@@ -22,6 +23,25 @@ export class Synth {
 
   async enable() {
     try {
+      // Safari's default ambient session can be muted by the iPhone silent switch.
+      const session = (
+        globalThis.navigator as
+          | (Navigator & {
+              audioSession?: { type: string };
+            })
+          | undefined
+      )?.audioSession;
+
+      if (session) {
+        try {
+          session.type = 'playback';
+        } catch {
+          /* Older implementations may expose a read-only session. */
+        }
+      }
+
+      if ((this.context?.state as string) === 'interrupted') this.dispose();
+
       if (!this.context || this.context.state === 'closed') {
         this.context = new AudioContext({ latencyHint: 'interactive' });
         this.master = this.context.createGain();
@@ -42,7 +62,17 @@ export class Synth {
         };
       }
 
-      await this.context.resume();
+      // Schedule output synchronously within the activation gesture, before awaiting resume.
+      const context = this.context;
+      const resume = context.resume();
+      const unlock = context.createBufferSource();
+
+      unlock.buffer = context.createBuffer(1, 1, context.sampleRate);
+      unlock.connect(context.destination);
+      unlock.onended = () => unlock.disconnect();
+      unlock.start();
+      await resume;
+      if (this.context !== context) return;
       this.onStatus(this.context.state === 'running' ? 'ready' : 'suspended');
     } catch {
       this.onStatus('error');
@@ -74,7 +104,7 @@ export class Synth {
     filter.connect(envelope);
     envelope.connect(this.master);
     oscillator.start();
-    this.voices.set(id, { oscillator, envelope, filter });
+    this.voices.set(id, { oscillator, envelope, filter, startedAt: now });
 
     return true;
   }
@@ -97,7 +127,12 @@ export class Synth {
     if (!voice || !this.context) return;
     const now = this.context.currentTime;
 
-    voice.envelope.gain.cancelAndHoldAtTime(now);
+    // The envelope is a known linear attack; avoid cancelAndHoldAtTime, absent in
+    // some desktop engines. Preserve the attack level even for very short taps.
+    const level = 0.13 * Math.min(1, Math.max(0, (now - voice.startedAt) / 0.012));
+
+    voice.envelope.gain.cancelScheduledValues(now);
+    voice.envelope.gain.setValueAtTime(level, now);
     voice.envelope.gain.linearRampToValueAtTime(0, now + 0.045);
     voice.oscillator.stop(now + 0.05);
 
@@ -119,7 +154,9 @@ export class Synth {
 
     if (this.context) {
       this.context.onstatechange = null;
-      void this.context.close();
+      void this.context.close().catch(() => {});
+      this.context = undefined;
+      this.master = undefined;
     }
   }
 }

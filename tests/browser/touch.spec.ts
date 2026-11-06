@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { diameterForRows } from '../../src/instrument/keySize';
 import { makeLayout } from '../../src/instrument/layout';
 
@@ -7,7 +7,7 @@ import { installProbe, type Audit } from './audioProbe';
 test('mobile touch activation and operating-system-style audio interruption', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name === 'desktop-chromium', 'Touch devices only.');
+  test.skip(testInfo.project.name.startsWith('desktop'), 'Touch devices only.');
   await installProbe(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Enable audio' }).tap();
@@ -63,6 +63,29 @@ test('mobile touch activation and operating-system-style audio interruption', as
       page.evaluate(() => (window as unknown as { synthAudit: Audit }).synthAudit.context.state),
     )
     .toBe('running');
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+
+  await page.evaluate(() =>
+    Object.assign(window, {
+      previousContext: (window as unknown as { synthAudit: Audit }).synthAudit.context,
+    }),
+  );
+
+  await page.getByRole('button', { name: 'Restart audio' }).click();
+
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { previousContext: AudioContext; synthAudit: Audit })
+            .previousContext !== (window as unknown as { synthAudit: Audit }).synthAudit.context,
+      ),
+    )
+    .toBe(true);
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Resume audio' })).toHaveCount(0);
 });
 
 test('Android multitouch bends one voice while another holds and rotation releases both', async ({
@@ -129,21 +152,109 @@ test('Android multitouch bends one voice while another holds and rotation releas
   await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 });
 
-test('three fingers landing together start three voices and cancellation releases them', async ({
+for (const mode of ['pointer', 'touch']) {
+  test(`three fingers land and release independently with ${mode} input`, async ({
+    page,
+    context,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'android-chromium',
+      'Native Chromium three-finger protocol.',
+    );
+
+    await installProbe(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByLabel('Touch input', { exact: true }).selectOption(mode);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.getByRole('button', { name: 'Enable audio' }).tap();
+
+    await expect
+      .poll(() =>
+        page.evaluate(() => (window as unknown as { synthAudit: Audit }).synthAudit.context.state),
+      )
+      .toBe('running');
+
+    const box = await page.getByTestId('keyboard').boundingBox();
+
+    if (!box) throw new Error('Keyboard missing');
+    const layout = makeLayout(box.width, box.height, diameterForRows(box.height), false, {
+      edo: 7,
+      a: 1,
+      b: 4,
+      register: 0,
+    });
+    const keys = layout.keys.filter((key) => key.r === 2).slice(2, 5);
+    const points = keys.map((key, id) => ({ id: id + 1, x: box.x + key.x, y: box.y + key.y }));
+    const session = await context.newCDPSession(page);
+
+    const active = () =>
+      page.evaluate(
+        () =>
+          (window as unknown as { synthAudit: Audit }).synthAudit.voices.filter((v) => !v.stopped)
+            .length,
+      );
+
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points });
+    await expect.poll(active).toBe(3);
+
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { synthAudit: Audit }).synthAudit.voices.length,
+      ),
+    ).toBe(3);
+
+    await session.send('Input.dispatchTouchEvent', {
+      type: 'touchEnd',
+      touchPoints: points.slice(0, 1),
+    });
+
+    await expect.poll(active).toBe(2);
+    await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+    await expect.poll(active).toBe(0);
+    await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points });
+    await expect.poll(active).toBe(3);
+    await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await expect.poll(active).toBe(0);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await expect(page.getByText('Contacts: 0 · peak: 3 · cancellations: 2')).toBeVisible();
+
+    await page
+      .getByLabel('Touch input', { exact: true })
+      .selectOption(mode === 'pointer' ? 'touch' : 'pointer');
+
+    await expect(page.getByText('Contacts: 0 · peak: 0 · cancellations: 0')).toBeVisible();
+  });
+}
+
+test('enabled audio produces a nonzero signal and releases to silence', async ({
   page,
-  context,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== 'android-chromium', 'Native Chromium three-finger protocol.');
-  await installProbe(page);
+  test.skip(testInfo.project.name.startsWith('desktop'), 'Mobile audio activation.');
+
+  await page.addInitScript(() => {
+    const Native = window.AudioContext;
+
+    window.AudioContext = class extends Native {
+      createGain() {
+        const gain = super.createGain();
+
+        if (!(window as unknown as { signal?: AnalyserNode }).signal) {
+          const analyser = this.createAnalyser();
+
+          analyser.fftSize = 256;
+          gain.connect(analyser);
+          Object.assign(window, { signal: analyser });
+        }
+
+        return gain;
+      }
+    };
+  });
+
   await page.goto('/');
   await page.getByRole('button', { name: 'Enable audio' }).tap();
-
-  await expect
-    .poll(() =>
-      page.evaluate(() => (window as unknown as { synthAudit: Audit }).synthAudit.context.state),
-    )
-    .toBe('running');
-
+  await expect(page.locator('canvas')).toBeVisible();
   const box = await page.getByTestId('keyboard').boundingBox();
 
   if (!box) throw new Error('Keyboard missing');
@@ -153,36 +264,22 @@ test('three fingers landing together start three voices and cancellation release
     b: 4,
     register: 0,
   });
-  const keys = layout.keys.filter((key) => key.r === 2).slice(2, 5);
-  const points = keys.map((key, id) => ({ id: id + 1, x: box.x + key.x, y: box.y + key.y }));
-  const session = await context.newCDPSession(page);
+  const key = layout.keys[Math.floor(layout.keys.length / 2)];
 
-  const active = () =>
-    page.evaluate(
-      () =>
-        (window as unknown as { synthAudit: Audit }).synthAudit.voices.filter((v) => !v.stopped)
-          .length,
-    );
+  const rms = () =>
+    page.evaluate(() => {
+      const analyser = (window as unknown as { signal: AnalyserNode }).signal;
+      const samples = new Float32Array(analyser.fftSize);
 
-  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points });
-  await expect.poll(active).toBe(3);
+      analyser.getFloatTimeDomainData(samples);
 
-  expect(
-    await page.evaluate(
-      () => (window as unknown as { synthAudit: Audit }).synthAudit.voices.length,
-    ),
-  ).toBe(3);
+      return Math.sqrt(samples.reduce((sum, sample) => sum + sample * sample, 0) / samples.length);
+    });
 
-  await session.send('Input.dispatchTouchEvent', {
-    type: 'touchEnd',
-    touchPoints: points.slice(0, 1),
-  });
-
-  await expect.poll(active).toBe(2);
-  await session.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
-  await expect.poll(active).toBe(0);
-  await session.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: points });
-  await expect.poll(active).toBe(3);
-  await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-  await expect.poll(active).toBe(0);
+  // A mouse pointer exercises the same voice sink in WebKit's mobile emulation.
+  await page.mouse.move(box.x + key.x, box.y + key.y);
+  await page.mouse.down();
+  await expect.poll(rms).toBeGreaterThan(0.001);
+  await page.mouse.up();
+  await expect.poll(rms).toBeLessThan(0.00001);
 });

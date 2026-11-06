@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { installProbe, type Audit } from './audioProbe';
 
 async function mockDisplay(page: import('@playwright/test').Page, supported = true) {
@@ -43,7 +43,7 @@ async function mockDisplay(page: import('@playwright/test').Page, supported = tr
 test('one portrait tap starts audio, requests fullscreen, then locks landscape', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name === 'desktop-chromium', 'Mobile start gesture.');
+  test.skip(testInfo.project.name.startsWith('desktop'), 'Mobile start gesture.');
   await installProbe(page);
   await mockDisplay(page);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -88,7 +88,7 @@ test('one portrait tap starts audio, requests fullscreen, then locks landscape',
 test('unsupported fullscreen leaves a working manual landscape fallback', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name === 'desktop-chromium', 'Mobile fallback.');
+  test.skip(testInfo.project.name.startsWith('desktop'), 'Mobile fallback.');
   await installProbe(page);
   await mockDisplay(page, false);
   await page.setViewportSize({ width: 390, height: 844 });
@@ -111,7 +111,7 @@ test('unsupported fullscreen leaves a working manual landscape fallback', async 
 test('mobile keyboard fills the viewport and tuning selection dismisses its overlay', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name === 'desktop-chromium', 'Mobile edge-to-edge layout.');
+  test.skip(testInfo.project.name.startsWith('desktop'), 'Mobile edge-to-edge layout.');
   await page.goto('/');
   const box = await page.getByTestId('keyboard').boundingBox();
   const viewport = page.viewportSize();

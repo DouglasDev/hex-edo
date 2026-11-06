@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
+import { installProbe, type Audit } from './audioProbe';
 import { makeLayout } from '../../src/instrument/layout';
 
 test('audio activation, all EDO choices, settings validation and persistence', async ({
@@ -14,10 +15,10 @@ test('audio activation, all EDO choices, settings validation and persistence', a
   await expect(page.locator('canvas')).toBeVisible();
 
   for (let edo = 2; edo <= 9; edo++) {
-    if (testInfo.project.name !== 'desktop-chromium')
+    if (!testInfo.project.name.startsWith('desktop'))
       await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByLabel('EDO tuning').selectOption(String(edo));
-    if (testInfo.project.name === 'desktop-chromium') {
+    if (testInfo.project.name.startsWith('desktop')) {
       await expect(page.getByLabel('EDO tuning')).toHaveValue(String(edo));
       await expect(page.getByLabel('EDO tuning')).not.toBeFocused();
     } else
@@ -27,7 +28,7 @@ test('audio activation, all EDO choices, settings validation and persistence', a
       );
   }
 
-  if (testInfo.project.name !== 'desktop-chromium')
+  if (!testInfo.project.name.startsWith('desktop'))
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByLabel('EDO tuning').selectOption('6');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
@@ -56,7 +57,7 @@ test('portrait blocks mobile play and landscape restores the keyboard', async ({
   if (testInfo.project.name === 'iphone-webkit')
     await page.evaluate(() => window.dispatchEvent(new Event('resize')));
 
-  if (testInfo.project.name === 'desktop-chromium') {
+  if (testInfo.project.name.startsWith('desktop')) {
     await expect(page.getByTestId('keyboard')).toBeVisible();
     await expect(page.getByText('Rotate your phone')).toHaveCount(0);
   } else {
@@ -72,7 +73,7 @@ test('portrait blocks mobile play and landscape restores the keyboard', async ({
 test('audio receives independent desktop shortcuts and pointer cleanup', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== 'desktop-chromium', 'Physical key path is desktop only.');
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Physical key path is desktop only.');
 
   await page.addInitScript(() => {
     const NativeAudioContext = window.AudioContext;
@@ -135,4 +136,56 @@ test('audio receives independent desktop shortcuts and pointer cleanup', async (
   await page.keyboard.down('b');
   await expect.poll(async () => (await audit()).filter((voice) => !voice.stopped).length).toBe(1);
   await page.keyboard.up('b');
+});
+
+test('keyup releases before a focused page element stops bubbling, without cancelAndHoldAtTime', async ({
+  page,
+}, testInfo) => {
+  test.skip(!testInfo.project.name.startsWith('desktop'), 'Desktop key release.');
+
+  await page.addInitScript(() => {
+    Object.defineProperty(AudioParam.prototype, 'cancelAndHoldAtTime', {
+      configurable: true,
+      value: undefined,
+    });
+
+    document.addEventListener('keyup', (event) => event.stopPropagation());
+  });
+
+  await installProbe(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Enable audio' }).click();
+  await expect(page.locator('canvas')).toBeVisible();
+
+  const active = () =>
+    page.evaluate(
+      () =>
+        (window as unknown as { synthAudit: Audit }).synthAudit.voices.filter((v) => !v.stopped)
+          .length,
+    );
+
+  // Give the rendering scene its first frame before sending the first key.
+  await expect
+    .poll(async () => {
+      await page.keyboard.press('a');
+
+      return page.evaluate(
+        () => (window as unknown as { synthAudit: Audit }).synthAudit.voices.length,
+      );
+    })
+    .toBeGreaterThan(0);
+
+  await expect.poll(active).toBe(0);
+  await page.keyboard.down('a');
+  await page.keyboard.down('s');
+  await expect.poll(active).toBe(2);
+  await page.keyboard.up('a');
+  await expect.poll(active).toBe(1);
+  await page.keyboard.up('s');
+  await expect.poll(active).toBe(0);
+  await page.keyboard.down('d');
+  await expect.poll(active).toBe(1);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect.poll(active).toBe(0);
+  await page.keyboard.up('d');
 });

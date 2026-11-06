@@ -1,9 +1,11 @@
+import type { InputMonitor } from './InputMonitor';
 import type { Performance } from '../instrument/Performance';
 
 /** Touch Events expose every newly landed finger in a single changedTouches batch. */
 export function bindTouchBatch(
   element: HTMLElement,
   player: () => Performance | undefined,
+  monitor: InputMonitor,
 ): (() => void) | undefined {
   if (!('ontouchstart' in window)) return undefined;
 
@@ -17,8 +19,13 @@ export function bindTouchBatch(
     for (const touch of Array.from(event.changedTouches)) {
       const id = `touch:${touch.identifier}`;
 
-      if (phase === 'up') performance.up(id);
-      else performance[phase](id, touch.clientX - bounds.left, touch.clientY - bounds.top);
+      if (phase === 'up') {
+        monitor.up(id, event.type === 'touchcancel');
+        performance.up(id);
+      } else {
+        if (phase === 'down') monitor.down(id);
+        performance[phase](id, touch.clientX - bounds.left, touch.clientY - bounds.top);
+      }
     }
   };
 

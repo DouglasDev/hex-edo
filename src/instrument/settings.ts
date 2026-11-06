@@ -7,6 +7,7 @@ export interface Settings extends Mapping {
   sizeMode: 'rows' | 'pixels';
   timbre: Timbre;
   volume: number;
+  touchInput: 'pointer' | 'touch';
 }
 
 export const DEFAULTS: Settings = {
@@ -18,6 +19,7 @@ export const DEFAULTS: Settings = {
   sizeMode: 'rows',
   timbre: 'triangle',
   volume: 0.6,
+  touchInput: 'pointer',
 };
 
 const STORAGE_KEY = 'hex-edo.settings.v3';
@@ -53,6 +55,7 @@ export function readSettings(): Settings {
 
     return {
       ...value,
+      touchInput: value.touchInput === 'touch' ? 'touch' : 'pointer',
       sizeMode: stored !== null ? value.sizeMode : value.size === 76 ? 'rows' : 'pixels',
       volume:
         stored === null && previous === null && value.volume === 0.3
